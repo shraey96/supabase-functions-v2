@@ -12,13 +12,13 @@ export function validateRequest(formData: FormData): {
   isValid: boolean;
   response?: Response;
   prompt?: string;
-  paymentToken?: string;
+  transactionId?: string;
   userEmail?: string;
   images?: File[];
 } {
   // Extract data
   const prompt = formData.get("prompt");
-  const paymentToken = formData.get("paymentToken");
+  const transactionId = formData.get("transactionId");
   const userEmail = formData.get("userEmail");
 
   // Get all images from the 'images' field
@@ -48,7 +48,7 @@ export function validateRequest(formData: FormData): {
   }
 
   // Validate payment token
-  if (!paymentToken || typeof paymentToken !== "string") {
+  if (!transactionId || typeof transactionId !== "string") {
     return {
       isValid: false,
       response: sendAPIResponse(
@@ -85,7 +85,7 @@ export function validateRequest(formData: FormData): {
   return {
     isValid: true,
     prompt,
-    paymentToken,
+    transactionId,
     userEmail,
     images,
   };

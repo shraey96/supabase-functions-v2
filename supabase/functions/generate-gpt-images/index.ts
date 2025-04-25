@@ -11,6 +11,7 @@ import {
 import supabaseClient from "./utils/supabaseClient.ts";
 import { generateImages } from "./utils/openai.ts";
 import { validateRequest } from "./utils/validation.ts";
+import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
 
 // Handle OPTIONS requests for CORS
 async function handleOptions() {
@@ -44,9 +45,52 @@ Deno.serve(async (req: Request) => {
       return validationResult.response!;
     }
 
-    const { prompt, paymentToken, userEmail, images } = validationResult;
+    const { prompt, transactionId, userEmail, images } = validationResult;
+
+    console.log(`Processing request for transaction: ${transactionId}`);
+
+    // check if transaction_id is not present in the database
+    const { data, error } = await supabaseClient
+      .from("ad_generation_inputs")
+      .select("*")
+      .eq("transaction_id", transactionId);
+
+    if (error) {
+      return sendAPIResponse(
+        {
+          error: `Failed to check transaction: ${error.message}`,
+        },
+        400
+      );
+    }
+
+    if (data && data.length > 0) {
+      return sendAPIResponse(
+        {
+          error: `Transaction already processed for ${transactionId}`,
+        },
+        400
+      );
+    }
+
+    // Validate transaction with Paddle API
+    try {
+      console.log("Validating transaction with Paddle API");
+      const transaction = await validatePaddleTransaction(transactionId!);
+      console.log(`Transaction validated: ${transaction.id}`);
+    } catch (paddleError) {
+      console.error("Paddle validation failed:", paddleError);
+      return sendAPIResponse(
+        {
+          error: "Invalid transaction",
+          details: paddleError.message,
+        },
+        400
+      );
+    }
 
     // Save original images to storage
+    console.log("Processing and saving original images");
     const imagePaths: string[] = [];
     for (const img of images!) {
       const imagePath = await processAndSaveImage(img);
@@ -54,15 +98,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // Store request details in database
+    console.log("Storing request details in database");
     await supabaseClient.from("ad_generation_inputs").insert({
       user_email: userEmail,
       prompt,
-      payment_token: paymentToken,
+      transaction_id: transactionId,
       image_paths: imagePaths,
     });
 
     // Call OpenAI API directly with the files
-    // Use b64_json response format to get base64 data
+    console.log("Calling OpenAI API to generate images");
     const imageResults = await generateImages(
       prompt!,
       images!,
@@ -83,6 +128,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Store results in database
+    console.log("Storing results in database");
     await storeResultData(userEmail!, resultImageUrls);
 
     console.log("Result image URLs:", resultImageUrls);

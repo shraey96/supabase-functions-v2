@@ -46,7 +46,7 @@ export async function generateImages(
     prompt,
     n: count,
     quality,
-    size: "1024x1024",
+    size: "auto",
     image: images,
   } as any);
 
