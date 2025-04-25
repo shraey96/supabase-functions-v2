@@ -100,7 +100,7 @@ Deno.serve(async (req: Request) => {
         error: "Failed to generate images",
         details: error.message,
       },
-      500
+      400
     );
   }
 });
