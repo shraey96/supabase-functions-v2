@@ -1,7 +1,6 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import OpenAI, { toFile } from "npm:openai";
-import { config } from "../config/rate-limiter.ts";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -46,7 +45,7 @@ export async function generateImages(
     model: "gpt-image-1",
     prompt,
     n: count,
-    quality: config.IS_FREE ? "medium" : quality,
+    quality,
     size: "auto",
     image: images,
   } as any);
@@ -55,6 +54,36 @@ export async function generateImages(
 
   // Extract and return results based on response format
   return response.data.map((item) => item.b64_json || "");
+}
+
+/**
+ * Uses GPT-4o-mini to format and enhance a prompt for image generation
+ * @param prompt - The original prompt to be formatted
+ * @returns A formatted prompt optimized for image generation
+ */
+export async function getImageGenPrompt(prompt: string): Promise<string> {
+  const systemPrompt = `You are an expert in writing structured prompts for ad image generation.
+
+Your task is to reformat and enhance the user's prompt by:
+- Making the structure clear, concise, and visually descriptive.
+- Rewording for clarity, but not adding or removing details unless clearly implied by the user.
+- Improving flow, style, and grammar without changing the original meaning.
+
+Preserve all user-specified elements (product details, styles, settings) unless clarification is needed.
+
+Output only the final, enhanced prompt. Do not include any commentary.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 500,
+  });
+
+  return response.choices[0].message.content || prompt;
 }
 
 // Export the OpenAI client and toFile utility for direct use if needed

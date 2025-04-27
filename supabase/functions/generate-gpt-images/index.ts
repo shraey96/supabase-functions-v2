@@ -9,7 +9,7 @@ import {
   storeResultData,
 } from "./utils/storage.ts";
 import supabaseClient from "./utils/supabaseClient.ts";
-import { generateImages } from "./utils/openai.ts";
+import { generateImages, getImageGenPrompt } from "./utils/openai.ts";
 import { validateRequest } from "./utils/validation.ts";
 import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
 import { checkRateLimit } from "../shared/utils/rate-limiter.ts";
@@ -144,10 +144,15 @@ Deno.serve(async (req: Request) => {
       image_paths: imagePaths,
     });
 
+    console.log("Calling OpenAI API to format prompt");
+    const formattedPrompt = await getImageGenPrompt(prompt!);
+
+    console.log("Formatted prompt:", formattedPrompt);
+
     // Call OpenAI API directly with the files
     console.log("Calling OpenAI API to generate images");
     const imageResults = await generateImages(
-      prompt!,
+      formattedPrompt,
       images!,
       1 // Number of images to generate
     );
