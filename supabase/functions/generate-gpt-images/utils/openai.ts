@@ -1,6 +1,7 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import OpenAI, { toFile } from "npm:openai";
+import { config } from "../config/rate-limiter.ts";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -45,7 +46,7 @@ export async function generateImages(
     model: "gpt-image-1",
     prompt,
     n: count,
-    quality,
+    quality: config.IS_FREE ? "medium" : quality,
     size: "auto",
     image: images,
   } as any);

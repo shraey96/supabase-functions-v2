@@ -8,9 +8,9 @@ export const config = {
   IS_FREE: true,
   /** Rate limiter configuration */
   rateLimiter: {
-    maxRequestsPerDay: 2,
+    maxRequestsPerDay: 3,
     functionName: "generate-gpt-images",
     errorMessage:
-      "You have exceeded the daily limit of 2 image generation requests. Please try again tomorrow.",
+      "You have exceeded the daily limit of 3 image generation requests. Please try again tomorrow.",
   } as RateLimiterConfig,
 };

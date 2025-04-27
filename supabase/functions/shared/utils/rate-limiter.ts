@@ -50,8 +50,6 @@ export async function checkRateLimit(
       now.getUTCMonth(),
       now.getUTCDate()
     );
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     // Check if there's an existing record for this IP and function
     const { data: existingRecord, error: fetchError } = await supabaseClient
@@ -67,26 +65,33 @@ export async function checkRateLimit(
       throw fetchError;
     }
 
-    // If no record exists or the last request was before today, create a new record
-    if (!existingRecord || new Date(existingRecord.last_request) < today) {
-      const { error: insertError } = await supabaseClient
-        .from("rate_limits")
-        .upsert({
-          ip_address: ipAddress,
-          function_name: functionName,
-          request_count: 1,
-          last_request: now.toISOString(),
-          reset_at: tomorrow.toISOString(),
-        });
+    // If no record exists, allow the request
+    if (!existingRecord) {
+      return {
+        allowed: true,
+        remainingRequests: maxRequestsPerDay,
+      };
+    }
 
-      if (insertError) {
-        console.error("Error creating rate limit record:", insertError);
-        throw insertError;
+    // If last request was before today, reset the count
+    if (new Date(existingRecord.last_request) < today) {
+      const { error: updateError } = await supabaseClient
+        .from("rate_limits")
+        .update({
+          request_count: 0,
+          last_request: now.toISOString(),
+        })
+        .eq("ip_address", ipAddress)
+        .eq("function_name", functionName);
+
+      if (updateError) {
+        console.error("Error resetting rate limit record:", updateError);
+        throw updateError;
       }
 
       return {
         allowed: true,
-        remainingRequests: maxRequestsPerDay - 1,
+        remainingRequests: maxRequestsPerDay,
       };
     }
 
@@ -101,12 +106,91 @@ export async function checkRateLimit(
       };
     }
 
+    return {
+      allowed: true,
+      remainingRequests: maxRequestsPerDay - existingRecord.request_count,
+    };
+  } catch (error) {
+    console.error("Rate limiter error:", error);
+    // In case of errors, allow the request to proceed
+    return {
+      allowed: true,
+      remainingRequests: 0,
+    };
+  }
+}
+
+/**
+ * Updates the rate limit counter for a successful operation
+ * @param ipAddress The IP address to update
+ * @param config Rate limiter configuration
+ * @returns Updated rate limiter result with remaining requests
+ */
+export async function updateRateLimit(
+  ipAddress: string,
+  config: RateLimiterConfig
+): Promise<RateLimiterResult> {
+  if (!ipAddress) {
+    throw new Error("IP address is required for rate limiting");
+  }
+
+  const { maxRequestsPerDay, functionName } = config;
+
+  try {
+    // Get current date in UTC
+    const now = new Date();
+
+    // Check if there's an existing record for this IP and function
+    const { data: existingRecord, error: fetchError } = await supabaseClient
+      .from("rate_limits")
+      .select("*")
+      .eq("ip_address", ipAddress)
+      .eq("function_name", functionName)
+      .single();
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Error fetching rate limit record:", fetchError);
+      throw fetchError;
+    }
+
+    // If no record exists, create a new one
+    if (!existingRecord) {
+      const { error: insertError } = await supabaseClient
+        .from("rate_limits")
+        .insert({
+          ip_address: ipAddress,
+          function_name: functionName,
+          request_count: 1,
+          last_request: now.toISOString(),
+          reset_at: new Date(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() + 1
+          ).toISOString(),
+        });
+
+      if (insertError) {
+        console.error("Error creating rate limit record:", insertError);
+        throw insertError;
+      }
+
+      return {
+        allowed: true,
+        remainingRequests: maxRequestsPerDay - 1,
+      };
+    }
+
     // Update the request count
     const { error: updateError } = await supabaseClient
       .from("rate_limits")
       .update({
         request_count: existingRecord.request_count + 1,
         last_request: now.toISOString(),
+        reset_at: new Date(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() + 1
+        ).toISOString(),
       })
       .eq("ip_address", ipAddress)
       .eq("function_name", functionName);

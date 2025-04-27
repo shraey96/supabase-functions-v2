@@ -14,6 +14,7 @@ import { validateRequest } from "./utils/validation.ts";
 import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
 import { checkRateLimit } from "../shared/utils/rate-limiter.ts";
 import { config } from "./config/rate-limiter.ts";
+import { updateRateLimit } from "../shared/utils/rate-limiter.ts";
 
 // Handle OPTIONS requests for CORS
 async function handleOptions() {
@@ -49,17 +50,22 @@ Deno.serve(async (req: Request) => {
 
     const { prompt, transactionId, userEmail, images } = validationResult;
 
+    // Get client IP address from headers
+    const ipAddress =
+      req.headers.get("x-real-ip") ||
+      req.headers.get("x-client-ip") ||
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("true-client-ip") ||
+      req.headers.get("x-cluster-client-ip") ||
+      req.headers.get("x-forwarded-for")?.split(",")[0] ||
+      req.headers.get("x-forwarded")?.split(",")[0] ||
+      "unknown";
+    console.log(`Request from IP: ${ipAddress}`);
+
     let remainingRequests: number | undefined;
 
     // Only check rate limit in free mode
     if (config.IS_FREE) {
-      // Get client IP address from headers
-      const ipAddress =
-        req.headers.get("x-real-ip") ||
-        req.headers.get("x-forwarded-for")?.split(",")[0] ||
-        "unknown";
-      console.log(`Request from IP: ${ipAddress}`);
-
       // Check rate limit
       const rateLimitResult = await checkRateLimit(
         ipAddress,
@@ -75,8 +81,6 @@ Deno.serve(async (req: Request) => {
           429
         );
       }
-
-      remainingRequests = rateLimitResult.remainingRequests;
     }
 
     console.log(`Processing request for transaction: ${transactionId}`);
@@ -164,6 +168,15 @@ Deno.serve(async (req: Request) => {
     // Store results in database
     console.log("Storing results in database");
     await storeResultData(userEmail!, resultImageUrls);
+
+    // Only update rate limit in free mode after successful image generation
+    if (config.IS_FREE) {
+      const rateLimitResult = await updateRateLimit(
+        ipAddress,
+        config.rateLimiter
+      );
+      remainingRequests = rateLimitResult.remainingRequests;
+    }
 
     console.log("Result image URLs:", resultImageUrls);
 
