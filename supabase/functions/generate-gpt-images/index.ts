@@ -12,6 +12,8 @@ import supabaseClient from "./utils/supabaseClient.ts";
 import { generateImages } from "./utils/openai.ts";
 import { validateRequest } from "./utils/validation.ts";
 import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
+import { checkRateLimit } from "../shared/utils/rate-limiter.ts";
+import { config } from "./config/rate-limiter.ts";
 
 // Handle OPTIONS requests for CORS
 async function handleOptions() {
@@ -47,6 +49,36 @@ Deno.serve(async (req: Request) => {
 
     const { prompt, transactionId, userEmail, images } = validationResult;
 
+    let remainingRequests: number | undefined;
+
+    // Only check rate limit in free mode
+    if (config.IS_FREE) {
+      // Get client IP address from headers
+      const ipAddress =
+        req.headers.get("x-real-ip") ||
+        req.headers.get("x-forwarded-for")?.split(",")[0] ||
+        "unknown";
+      console.log(`Request from IP: ${ipAddress}`);
+
+      // Check rate limit
+      const rateLimitResult = await checkRateLimit(
+        ipAddress,
+        config.rateLimiter
+      );
+
+      if (!rateLimitResult.allowed) {
+        return sendAPIResponse(
+          {
+            error: rateLimitResult.error,
+            remainingRequests: rateLimitResult.remainingRequests,
+          },
+          429
+        );
+      }
+
+      remainingRequests = rateLimitResult.remainingRequests;
+    }
+
     console.log(`Processing request for transaction: ${transactionId}`);
 
     // check if transaction_id is not present in the database
@@ -73,20 +105,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validate transaction with Paddle API
-    try {
-      console.log("Validating transaction with Paddle API");
-      const transaction = await validatePaddleTransaction(transactionId!);
-      console.log(`Transaction validated: ${transaction.id}`);
-    } catch (paddleError) {
-      console.error("Paddle validation failed:", paddleError);
-      return sendAPIResponse(
-        {
-          error: "Invalid transaction",
-          details: paddleError.message,
-        },
-        400
-      );
+    // Only validate transaction with Paddle API in paid mode
+    if (!config.IS_FREE) {
+      try {
+        console.log("Validating transaction with Paddle API");
+        const transaction = await validatePaddleTransaction(transactionId!);
+        console.log(`Transaction validated: ${transaction.id}`);
+      } catch (paddleError) {
+        console.error("Paddle validation failed:", paddleError);
+        return sendAPIResponse(
+          {
+            error: "Invalid transaction",
+            details: paddleError.message,
+          },
+          400
+        );
+      }
     }
 
     // Save original images to storage
@@ -137,6 +171,7 @@ Deno.serve(async (req: Request) => {
     return sendAPIResponse({
       success: true,
       images: resultImageUrls,
+      ...(config.IS_FREE && { remainingRequests }),
     });
   } catch (error) {
     console.error("Error in generate-gpt-images function:", error);
