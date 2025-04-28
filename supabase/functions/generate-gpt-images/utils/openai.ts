@@ -1,6 +1,8 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import OpenAI, { toFile } from "npm:openai";
+import { isDev } from "../../shared/constants.ts";
+import { config } from "../config/rate-limiter.ts";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -39,13 +41,19 @@ export async function generateImages(
   );
   console.log("Files converted to OpenAI compatible format");
 
+  let imageQuality = quality;
+
+  if (config.IS_FREE) {
+    imageQuality = "medium";
+  }
+
   // Call OpenAI API with files directly
   console.log("Calling OpenAI API");
   const response = await openai.images.edit({
     model: "gpt-image-1",
     prompt,
     n: count,
-    quality,
+    quality: imageQuality,
     size: "auto",
     image: images,
   } as any);
@@ -79,8 +87,6 @@ Output only the final, enhanced prompt. Do not include any commentary.`;
       { role: "system", content: systemPrompt },
       { role: "user", content: prompt },
     ],
-    temperature: 0.7,
-    max_tokens: 500,
   });
 
   return response.choices[0].message.content || prompt;

@@ -1,5 +1,6 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isDev } from "../constants.ts";
 
 /**
  * Paddle Transaction Validator utility
@@ -32,8 +33,6 @@ interface PaddleTransaction {
     request_id: string;
   };
 }
-
-const isDev = Deno.env.get("IS_DEV") === "true";
 
 const PADDLE_BASE_URL = isDev
   ? "https://sandbox-api.paddle.com"
