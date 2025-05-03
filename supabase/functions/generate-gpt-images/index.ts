@@ -124,19 +124,18 @@ Deno.serve(async (req: Request) => {
       imagePaths.push(imagePath);
     }
 
+    console.log("Calling OpenAI API to format prompt");
+    const formattedPrompt = await getImageGenPrompt(prompt!);
+    console.log("Formatted prompt:", formattedPrompt);
+
     // Store request details in database
     console.log("Storing request details in database");
     await supabaseClient.from("ad_generation_inputs").insert({
       user_email: userEmail,
-      prompt,
+      prompt: formattedPrompt,
       transaction_id: transactionId,
       image_paths: imagePaths,
     });
-
-    console.log("Calling OpenAI API to format prompt");
-    const formattedPrompt = await getImageGenPrompt(prompt!);
-
-    console.log("Formatted prompt:", formattedPrompt);
 
     // Call OpenAI API directly with the files
     console.log("Calling OpenAI API to generate images");
