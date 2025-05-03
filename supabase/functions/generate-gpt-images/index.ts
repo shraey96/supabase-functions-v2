@@ -2,7 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Import utility functions
-import { CORS_HEADERS, sendAPIResponse } from "./utils/cors.ts";
+import { sendAPIResponse, handleOptions } from "./utils/cors.ts";
 import {
   processAndSaveImage,
   saveBase64ImageToStorage,
@@ -15,17 +15,6 @@ import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
 import { checkRateLimit } from "../shared/utils/rate-limiter.ts";
 import { config } from "./config/rate-limiter.ts";
 import { updateRateLimit } from "../shared/utils/rate-limiter.ts";
-
-// Handle OPTIONS requests for CORS
-async function handleOptions() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      ...CORS_HEADERS,
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    },
-  });
-}
 
 Deno.serve(async (req: Request) => {
   try {

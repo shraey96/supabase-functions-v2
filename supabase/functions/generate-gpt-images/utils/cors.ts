@@ -18,3 +18,14 @@ export const sendAPIResponse = (
     },
   });
 };
+
+// Handle OPTIONS requests for CORS
+export async function handleOptions() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...CORS_HEADERS,
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    },
+  });
+}
