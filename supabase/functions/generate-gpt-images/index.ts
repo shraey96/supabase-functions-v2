@@ -34,6 +34,8 @@ Deno.serve(async (req: Request) => {
     // Check if mock_images is present
     const mockImages = formData.getAll("mock_images");
 
+    console.log({ mockImages });
+
     if (mockImages?.length > 0) {
       await sleep(2000);
       return sendAPIResponse({
