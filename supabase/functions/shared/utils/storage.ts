@@ -143,6 +143,3 @@ export async function storeResultData(
     throw new Error(`Failed to store result data: ${error.message}`);
   }
 }
-
-// Export supabaseClient for direct use if needed
-export { supabaseClient };

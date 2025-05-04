@@ -1,6 +1,6 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import supabaseClient from "../../generate-gpt-images/utils/supabaseClient.ts";
+import supabaseClient from "./supabaseClient.ts";
 
 /**
  * Rate limiter configuration interface

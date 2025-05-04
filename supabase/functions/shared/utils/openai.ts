@@ -2,7 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import OpenAI, { toFile } from "npm:openai";
 import { isDev } from "../../shared/constants.ts";
-import { config } from "../config/rate-limiter.ts";
+import { config } from "../../generate-gpt-images/config/rate-limiter.ts";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -43,7 +43,7 @@ export async function generateImages(
 
   let imageQuality = quality;
 
-  if (config.IS_FREE) {
+  if (isDev || config.IS_FREE) {
     imageQuality = "medium";
   }
 

@@ -2,19 +2,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Import utility functions
-import { sendAPIResponse, handleOptions } from "./utils/cors.ts";
+import { sendAPIResponse, handleOptions } from "../shared/utils/cors.ts";
 import {
   processAndSaveImage,
   saveBase64ImageToStorage,
   storeResultData,
-} from "./utils/storage.ts";
-import supabaseClient from "./utils/supabaseClient.ts";
-import { generateImages, getImageGenPrompt } from "./utils/openai.ts";
-import { validateRequest } from "./utils/validation.ts";
-import { validatePaddleTransaction } from "../shared/utils/paddle-validator.ts";
+} from "../shared/utils/storage.ts";
+import supabaseClient from "../shared/utils/supabaseClient.ts";
+import { generateImages, getImageGenPrompt } from "../shared/utils/openai.ts";
+import { validateRequest } from "../shared/utils/validation.ts";
 import { checkRateLimit } from "../shared/utils/rate-limiter.ts";
 import { config } from "./config/rate-limiter.ts";
 import { updateRateLimit } from "../shared/utils/rate-limiter.ts";
+import { sleep } from "../shared/utils/generic.ts";
 
 Deno.serve(async (req: Request) => {
   try {
@@ -30,6 +30,17 @@ Deno.serve(async (req: Request) => {
 
     // Parse form data
     const formData = await req.formData();
+
+    // Check if mock_images is present
+    const mockImages = formData.getAll("mock_images");
+
+    if (mockImages?.length > 0) {
+      await sleep(2000);
+      return sendAPIResponse({
+        success: true,
+        images: mockImages,
+      });
+    }
 
     // Validate request and extract data
     const validationResult = validateRequest(formData);
@@ -66,6 +77,7 @@ Deno.serve(async (req: Request) => {
           {
             error: rateLimitResult.error,
             remainingRequests: rateLimitResult.remainingRequests,
+            error_code: "rate_limit_exceeded",
           },
           429
         );
@@ -74,47 +86,31 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Processing request for transaction: ${transactionId}`);
 
+    // commenting this as first we are letting users use for free
     // check if transaction_id is not present in the database
-    const { data, error } = await supabaseClient
-      .from("ad_generation_inputs")
-      .select("*")
-      .eq("transaction_id", transactionId);
 
-    if (error) {
-      return sendAPIResponse(
-        {
-          error: `Failed to check transaction: ${error.message}`,
-        },
-        400
-      );
-    }
+    // const { data, error } = await supabaseClient
+    //   .from("ad_generation_inputs")
+    //   .select("*")
+    //   .eq("transaction_id", transactionId);
 
-    if (data && data.length > 0) {
-      return sendAPIResponse(
-        {
-          error: `Transaction already processed for ${transactionId}`,
-        },
-        400
-      );
-    }
+    // if (error) {
+    //   return sendAPIResponse(
+    //     {
+    //       error: `Failed to check transaction: ${error.message}`,
+    //     },
+    //     400
+    //   );
+    // }
 
-    // Only validate transaction with Paddle API in paid mode
-    if (!config.IS_FREE) {
-      try {
-        console.log("Validating transaction with Paddle API");
-        const transaction = await validatePaddleTransaction(transactionId!);
-        console.log(`Transaction validated: ${transaction.id}`);
-      } catch (paddleError) {
-        console.error("Paddle validation failed:", paddleError);
-        return sendAPIResponse(
-          {
-            error: "Invalid transaction",
-            details: paddleError.message,
-          },
-          400
-        );
-      }
-    }
+    // if (data && data.length > 0) {
+    //   return sendAPIResponse(
+    //     {
+    //       error: `Transaction already processed for ${transactionId}`,
+    //     },
+    //     400
+    //   );
+    // }
 
     // Save original images to storage
     console.log("Processing and saving original images");
