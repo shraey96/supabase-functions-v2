@@ -10,6 +10,14 @@ interface CreditOperation {
   params?: Record<string, any>;
 }
 
+interface CreditTransaction {
+  userId: string;
+  amount: number;
+  operation: string;
+  operationId?: string;
+  description?: string;
+}
+
 interface CreditResult {
   success: boolean;
   transactionId?: string;
@@ -18,46 +26,68 @@ interface CreditResult {
 }
 
 /**
- * Calculate credit cost for an operation based on config and parameters
+ * Calculates the total credit cost for an operation
+ * @param operation - The operation type
+ * @param params - Additional parameters affecting the cost
+ * @returns The total credit cost
  */
 export async function calculateCreditCost(
   operation: string,
   params: Record<string, any> = {}
 ): Promise<number> {
-  // Get the operation config
-  const { data, error } = await supabaseClient
-    .from("credit_configs")
-    .select("base_cost, additional_params")
-    .eq("operation", operation)
-    .single();
+  try {
+    // Get the operation configuration
+    const { data: configs, error } = await supabaseClient
+      .from("credit_configs")
+      .select("*")
+      .eq("operation", operation)
+      .limit(1);
 
-  if (error || !data) {
-    console.error(`Error fetching credit config for ${operation}:`, error);
-    // Return default cost if config not found
-    return 2;
-  }
-
-  // Start with base cost
-  let totalCost = data.base_cost;
-
-  // Apply additional costs based on params
-  const additionalParams = data.additional_params || {};
-
-  // For each parameter that affects cost
-  for (const [param, cost] of Object.entries(additionalParams)) {
-    // If the param exists in the request and is true/enabled
-    if (params[param] && (params[param] === true || params[param] > 0)) {
-      // If param is a counter (like number of samples), multiply by the value
-      if (typeof params[param] === "number" && params[param] > 1) {
-        totalCost += Number(cost) * (params[param] - 1);
-      } else {
-        // Otherwise add the fixed cost
-        totalCost += Number(cost);
-      }
+    if (error) {
+      console.error("Error fetching credit config:", error);
+      return 2; // Default cost if config not found
     }
-  }
 
-  return totalCost;
+    const config = configs?.[0];
+    if (!config) {
+      console.error("No credit config found for operation:", operation);
+      return 2; // Default cost if config not found
+    }
+
+    // if we add a premium user later, just use base cost instead of this.
+    let totalCost = config.additional_params[params.quality];
+
+    // Get quantity from params, default to 1 if not specified
+    const quantity = params.numSamples || 1;
+
+    const actualQuality = params.quality?.replace("_image", "");
+
+    // Add quality-based costs
+    // if (actualQuality === "high") {
+    //   totalCost += config.additional_params.high_image;
+    // } else if (actualQuality === "medium") {
+    //   totalCost += config.additional_params.medium_image;
+    // }
+
+    // Add premium style cost if applicable
+    // if (params.premium_style) {
+    //   totalCost += config.additional_params.premium_style;
+    // }
+
+    // // Add cost for extra samples if more than 1
+    // if (params.numSamples > 1) {
+    //   totalCost +=
+    //     config.additional_params.extra_sample * (params.numSamples - 1);
+    // }
+
+    // Multiply by quantity
+    totalCost *= quantity;
+
+    return totalCost;
+  } catch (error) {
+    console.error("Error calculating credit cost:", error);
+    return 2; // Default cost if calculation fails
+  }
 }
 
 /**

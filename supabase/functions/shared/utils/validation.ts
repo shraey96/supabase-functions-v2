@@ -102,7 +102,8 @@ export function validateAdFormData(formData: FormData): {
   isValid: boolean;
   response?: Response;
   prompt?: string;
-  visualStyle?: string;
+  name?: string;
+  adType?: string;
   brandId?: string;
   images?: File[];
   numSamples?: number;
@@ -110,7 +111,8 @@ export function validateAdFormData(formData: FormData): {
 } {
   // Extract data
   const prompt = formData.get("prompt");
-  const visualStyle = formData.get("visualStyle");
+  const name = formData.get("name");
+  const adType = formData.get("adType");
   const brandId = formData.get("brandId");
   const numSamples = formData.get("numSamples");
   const quality = formData.get("quality");
@@ -130,6 +132,22 @@ export function validateAdFormData(formData: FormData): {
     return {
       isValid: false,
       response: sendAPIResponse({ error: "Valid prompt is required" }, 400),
+    };
+  }
+
+  // Validate name
+  if (!name || typeof name !== "string") {
+    return {
+      isValid: false,
+      response: sendAPIResponse({ error: "Valid name is required" }, 400),
+    };
+  }
+
+  // Validate ad type
+  if (!adType || typeof adType !== "string") {
+    return {
+      isValid: false,
+      response: sendAPIResponse({ error: "Valid ad type is required" }, 400),
     };
   }
 
@@ -174,7 +192,7 @@ export function validateAdFormData(formData: FormData): {
   }
 
   // Validate quality
-  let validatedQuality: "high" | "medium" | "low" | "auto" = "auto";
+  let validatedQuality: "high" | "medium" | "low" | "auto" = "medium";
   if (quality) {
     const validQualities = ["high", "medium", "low", "auto"] as const;
     if (
@@ -196,7 +214,8 @@ export function validateAdFormData(formData: FormData): {
   return {
     isValid: true,
     prompt,
-    visualStyle: visualStyle?.toString(),
+    name: name.toString(),
+    adType: adType.toString(),
     brandId: brandId?.toString(),
     images,
     numSamples: parsedNumSamples,

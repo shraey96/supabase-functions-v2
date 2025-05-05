@@ -20,7 +20,7 @@ const openai = new OpenAI({
 export async function generateImages(
   prompt: string,
   imageFiles: File[],
-  count: number = 3,
+  count: number = 1,
   quality: "high" | "medium" | "low" | "auto" = "auto"
 ): Promise<string[]> {
   // Convert Files to OpenAI compatible format using toFile
@@ -44,7 +44,7 @@ export async function generateImages(
   let imageQuality = quality;
 
   if (isDev || config.IS_FREE) {
-    imageQuality = "medium";
+    imageQuality = "high";
   }
 
   // Call OpenAI API with files directly
@@ -57,7 +57,6 @@ export async function generateImages(
     size: "auto",
     image: images,
   } as any);
-
   console.log("OpenAI API response received");
 
   // Extract and return results based on response format

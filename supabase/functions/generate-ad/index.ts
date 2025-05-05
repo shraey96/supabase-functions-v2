@@ -16,9 +16,6 @@ import {
   calculateCreditCost,
 } from "./utils/creditManager.ts";
 import { validateAdFormData } from "../shared/utils/validation.ts";
-import { sleep } from "../shared/utils/generic.ts";
-
-const CREDITS_REQUIRED = 2;
 
 // Storage path helper for correct format
 const getStoragePath = (
@@ -77,59 +74,63 @@ Deno.serve(async (req: Request) => {
 
     const {
       prompt,
-      visualStyle,
+      name,
+      adType,
       brandId,
       images,
       numSamples = 1,
-      quality = "auto" as const,
+      quality = "medium" as const,
     } = validationResult;
 
     // Prepare parameters that affect credit cost
     const creditParams = {
-      high_quality: quality === "high",
-      extra_sample: numSamples > 1,
-      premium_style: visualStyle?.toLowerCase().includes("premium"),
+      quality: `${quality}_image`,
+      numSamples,
     };
 
-    // Get estimated credit cost
-    const estimatedCost = await calculateCreditCost(
+    console.log("creditParams", creditParams);
+
+    // Calculate estimated credit cost
+    const estimatedCreditCost = await calculateCreditCost(
       "generate_ad",
       creditParams
     );
 
+    console.log("estimatedCreditCost", estimatedCreditCost);
+
     // Skip credit check in dev mode
-    if (!isDev) {
-      // Deduct credits
-      const creditResult = await deductCredits({
-        operation: "generate_ad",
-        userId: userId!,
-        params: creditParams,
-      });
 
-      if (!creditResult.success) {
-        return sendAPIResponse(
-          {
-            error: creditResult.error || "Failed to process credits",
-            requiredCredits: estimatedCost,
-          },
-          402
-        );
-      }
+    // Deduct credits
+    const creditResult = await deductCredits({
+      operation: "generate_ad",
+      userId: userId!,
+      params: creditParams,
+    });
 
-      // Store transaction ID for potential refund
-      creditTransactionId = creditResult.transactionId!;
+    if (!creditResult.success) {
+      return sendAPIResponse(
+        {
+          error: creditResult.error || "Failed to process credits",
+          requiredCredits: estimatedCreditCost,
+        },
+        402
+      );
     }
+
+    // Store transaction ID for potential refund
+    creditTransactionId = creditResult.transactionId!;
 
     // Create a new ad record with status 'pending'
     const { data: adData, error: adError } = await supabaseClient
-      .from("ads")
+      .from("generated_ads")
       .insert({
         user_id: userId,
         brand_id: brandId || null, // Optional brand ID
+        name: name || "Untitled Ad",
         prompt: prompt,
-        visual_style: visualStyle,
+        ad_type: adType || "standard",
         status: "pending",
-        credits_used: estimatedCost,
+        credits_used: estimatedCreditCost,
         metadata: {
           ...creditParams,
           num_samples: numSamples,
@@ -165,7 +166,7 @@ Deno.serve(async (req: Request) => {
 
       // Update the ad record with original image paths
       await supabaseClient
-        .from("ads")
+        .from("generated_ads")
         .update({
           original_image_urls: imagePaths,
         })
@@ -179,7 +180,8 @@ Deno.serve(async (req: Request) => {
         formattedPrompt,
         images!,
         numSamples,
-        quality // Pass quality directly without mapping
+        // quality
+        isDev ? "low" : "medium"
       );
 
       // Save the generated images to storage
@@ -196,7 +198,7 @@ Deno.serve(async (req: Request) => {
 
       // Update the ad record with status 'completed' and result URLs
       await supabaseClient
-        .from("ads")
+        .from("generated_ads")
         .update({
           status: "completed",
           result_urls: resultImageUrls,
@@ -209,12 +211,12 @@ Deno.serve(async (req: Request) => {
         success: true,
         ad_id: adId,
         images: resultImageUrls,
-        credits_used: estimatedCost,
+        credits_used: estimatedCreditCost,
       });
     } catch (error) {
       // If any error occurs during processing, mark the ad as failed
       await supabaseClient
-        .from("ads")
+        .from("generated_ads")
         .update({
           status: "failed",
           error_message: error.message,
