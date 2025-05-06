@@ -7,6 +7,7 @@ import { sendAPIResponse, handleOptions } from "../shared/utils/cors.ts";
 import {
   processAndSaveImage,
   saveBase64ImageToStorage,
+  getStoragePathForUser,
 } from "../shared/utils/storage.ts";
 import supabaseClient from "../shared/utils/supabaseClient.ts";
 import { generateImages, getImageGenPrompt } from "../shared/utils/openai.ts";
@@ -16,18 +17,6 @@ import {
   calculateCreditCost,
 } from "./utils/creditManager.ts";
 import { validateAdFormData } from "../shared/utils/validation.ts";
-
-// Storage path helper for correct format
-const getStoragePath = (
-  userId: string,
-  adId: string,
-  index: number,
-  isResult: boolean
-) => {
-  return isResult
-    ? `user-ad-generation/${userId}/result/result_${adId}_${index}.png`
-    : `user-ad-generation/${userId}/inputs/input_${adId}_${index}.png`;
-};
 
 // Function to save image with the correct path format
 
@@ -160,7 +149,8 @@ Deno.serve(async (req: Request) => {
       // Save original images to storage
       const imagePaths: string[] = [];
       for (let i = 0; i < images!.length; i++) {
-        const imagePath = await processAndSaveImage(images![i]);
+        const inputImagePath = getStoragePathForUser(userId, adId, i, false);
+        const imagePath = await processAndSaveImage(images![i], inputImagePath);
         imagePaths.push(imagePath);
       }
 
@@ -188,10 +178,16 @@ Deno.serve(async (req: Request) => {
       const resultImageUrls: string[] = [];
       for (let i = 0; i < imageResults.length; i++) {
         const base64Data = imageResults[i];
+        const resultImagePath = getStoragePathForUser(userId, adId, i, true);
+        // Extract filename from the path for the 'fileName' argument, though it's less critical now
+        const resultFileName = resultImagePath.substring(
+          resultImagePath.lastIndexOf("/") + 1
+        );
         const resultImageUrl = await saveBase64ImageToStorage(
           base64Data,
-          `generated-ad-${i + 1}.png`,
-          true
+          resultFileName,
+          true, // isResult is conceptually true
+          resultImagePath // Pass the full custom path
         );
         resultImageUrls.push(resultImageUrl);
       }

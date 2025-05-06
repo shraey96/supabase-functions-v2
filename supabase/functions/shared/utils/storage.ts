@@ -19,20 +19,30 @@ function sanitizeFileName(fileName: string): string {
  * Saves an image to Supabase Storage
  * @param imageBuffer - The image data as a Uint8Array
  * @param fileName - Original filename
+ * @param isResult - Indicates if the image is a result or input
+ * @param customPath - Optional custom storage path
  * @returns The public URL of the uploaded image
  */
 export async function saveImageToStorage(
   imageBuffer: Uint8Array,
   fileName: string,
-  isResult: boolean = false
+  isResult: boolean = false,
+  customPath?: string
 ): Promise<string> {
   // Sanitize the filename
   const sanitizedFileName = sanitizeFileName(fileName);
-  const filePath = `ad-generation/${
-    isResult ? "results" : "inputs"
-  }/${crypto.randomUUID()}-${sanitizedFileName}`;
+  let filePath: string;
 
-  console.log(`Uploading to storage path: ${filePath}`);
+  if (customPath) {
+    filePath = customPath;
+    console.log(`Uploading to custom storage path: ${filePath}`);
+  } else {
+    // Fallback to existing logic if customPath is not provided
+    filePath = `ad-generation/${
+      isResult ? "results" : "inputs"
+    }/${crypto.randomUUID()}-${sanitizedFileName}`;
+    console.log(`Uploading to storage path: ${filePath}`);
+  }
 
   try {
     const { error } = await supabaseClient.storage
@@ -65,14 +75,19 @@ export async function saveImageToStorage(
 /**
  * Processes and saves a file to Supabase Storage
  * @param file - File object from form data
+ * @param customPath - Optional custom storage path
  * @returns The public URL of the uploaded image
  */
-export async function processAndSaveImage(file: File): Promise<string> {
+export async function processAndSaveImage(
+  file: File,
+  customPath?: string
+): Promise<string> {
   try {
     console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    return await saveImageToStorage(uint8Array, file.name);
+    // Pass customPath, isResult is effectively false for original images in this context for fallback
+    return await saveImageToStorage(uint8Array, file.name, false, customPath);
   } catch (error) {
     console.error(
       `Error processing image: ${
@@ -87,12 +102,15 @@ export async function processAndSaveImage(file: File): Promise<string> {
  * Saves base64 encoded image data to Supabase Storage
  * @param base64Data - Base64 encoded image data (without data URL prefix)
  * @param fileName - Name for the saved file
+ * @param isResult - Indicates if the image is a result or input
+ * @param customPath - Optional custom storage path
  * @returns The public URL of the uploaded image
  */
 export async function saveBase64ImageToStorage(
   base64Data: string,
   fileName: string,
-  isResult: boolean = false
+  isResult: boolean = false,
+  customPath?: string
 ): Promise<string> {
   try {
     console.log(`Converting base64 data for: ${fileName}`);
@@ -103,7 +121,7 @@ export async function saveBase64ImageToStorage(
     );
 
     // Save to storage
-    return await saveImageToStorage(uint8Array, fileName, isResult);
+    return await saveImageToStorage(uint8Array, fileName, isResult, customPath);
   } catch (error) {
     console.error(
       `Error saving base64 image: ${
@@ -143,3 +161,22 @@ export async function storeResultData(
     throw new Error(`Failed to store result data: ${error.message}`);
   }
 }
+
+/**
+ * Generates a standardized storage path for user-specific ad generation files.
+ * @param userId - The ID of the user.
+ * @param adId - The ID of the ad.
+ * @param index - The index of the image (for multiple images).
+ * @param isResult - Boolean indicating if the path is for a result image or an input image.
+ * @returns The formatted storage path string.
+ */
+export const getStoragePathForUser = (
+  userId: string,
+  adId: string,
+  index: number,
+  isResult: boolean
+): string => {
+  return isResult
+    ? `user-ad-generation/${userId}/result/result_${adId}_${index}.png`
+    : `user-ad-generation/${userId}/inputs/input_${adId}_${index}.png`;
+};
