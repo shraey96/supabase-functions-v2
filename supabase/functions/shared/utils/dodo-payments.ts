@@ -1,14 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import DodoPayments from "npm:dodopayments";
+import { Webhook } from "npm:standardwebhooks";
+
 import { isDev } from "../constants.ts";
 
+const DODO_PAYMENTS_WEBHOOK_KEY = Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY");
 const DODO_API_KEY = Deno.env.get("DODO_PAYMENTS_API_KEY");
-const DODO_ENV = isDev ? "test_mode" : "live_mode";
+// const DODO_ENV = isDev ? "test_mode" : "live_mode";
+
+const DODO_ENV = "test_mode";
 
 const dodoClient = new DodoPayments({
   apiKey: DODO_API_KEY,
   environment: DODO_ENV,
 });
+
+const dodoWebhook = new Webhook(DODO_PAYMENTS_WEBHOOK_KEY);
 
 // Define interface for the Dodo Payment response
 interface DodoPaymentCustomer {
@@ -56,6 +63,12 @@ interface DodoPaymentResponse {
   billing: DodoPaymentBilling;
 }
 
+interface WebhookUnbrandedRequiredHeaders {
+  "webhook-id": string;
+  "webhook-signature": string;
+  "webhook-timestamp": string;
+}
+
 // Function to validate Dodo payment by calling the Dodo API
 export async function validateDodoPayment(
   paymentId: string
@@ -99,6 +112,39 @@ export async function validateDodoPayment(
         error instanceof Error
           ? error.message
           : "Unknown error during Dodo payment validation",
+    };
+  }
+}
+
+export async function validateDodoWebhook(
+  req: Request,
+  requestData: Record<string, any>
+) {
+  try {
+    const body = requestData;
+    const webhookHeaders: WebhookUnbrandedRequiredHeaders = {
+      "webhook-id": (req.headers.get("webhook-id") || "") as string,
+      "webhook-signature": (req.headers.get("webhook-signature") ||
+        "") as string,
+      "webhook-timestamp": (req.headers.get("webhook-timestamp") ||
+        "") as string,
+    };
+
+    console.log({ webhookHeaders, DODO_PAYMENTS_WEBHOOK_KEY });
+
+    const raw = JSON.stringify(body);
+
+    await dodoWebhook.verify(raw, webhookHeaders);
+
+    return {
+      isValid: true,
+      body,
+    };
+  } catch (error) {
+    console.error("Error validating Dodo webhook:", error);
+    return {
+      isValid: false,
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

@@ -88,32 +88,6 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Processing request for transaction: ${transactionId}`);
 
-    // commenting this as first we are letting users use for free
-    // check if transaction_id is not present in the database
-
-    // const { data, error } = await supabaseClient
-    //   .from("ad_generation_inputs")
-    //   .select("*")
-    //   .eq("transaction_id", transactionId);
-
-    // if (error) {
-    //   return sendAPIResponse(
-    //     {
-    //       error: `Failed to check transaction: ${error.message}`,
-    //     },
-    //     400
-    //   );
-    // }
-
-    // if (data && data.length > 0) {
-    //   return sendAPIResponse(
-    //     {
-    //       error: `Transaction already processed for ${transactionId}`,
-    //     },
-    //     400
-    //   );
-    // }
-
     // Save original images to storage
     console.log("Processing and saving original images");
     const imagePaths: string[] = [];

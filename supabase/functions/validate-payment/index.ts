@@ -2,9 +2,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { sendAPIResponse, handleOptions } from "../shared/utils/cors.ts";
 import supabaseClient from "../shared/utils/supabaseClient.ts";
-import { validateDodoPayment } from "../shared/utils/dodo-payments.ts";
-
-const CREDITS_TO_ADD = 25; // Define credits to add for now
+import {
+  validateDodoPayment,
+  validateDodoWebhook,
+} from "../shared/utils/dodo-payments.ts";
+import { CREDIT_UPDATE_MAP } from "../shared/constants.ts";
 
 Deno.serve(async (req: Request) => {
   try {
@@ -47,8 +49,19 @@ Deno.serve(async (req: Request) => {
       return sendAPIResponse({ error: "Invalid JSON body." }, 400);
     }
 
+    console.log({ isFromWebhook, requestData });
+
     if (isFromWebhook) {
-      console.log({ requestData });
+      const dodoWebhookResult = await validateDodoWebhook(req, requestData);
+      if (!dodoWebhookResult.isValid) {
+        return sendAPIResponse(
+          { error: "Dodo webhook validation failed." },
+          422
+        );
+      }
+    }
+
+    if (isFromWebhook) {
       userId = requestData.data?.metadata?.user_id || null;
     } else {
       // Get user from JWT token
@@ -80,6 +93,9 @@ Deno.serve(async (req: Request) => {
     const payment_id = requestData.payment_id || requestData.data?.payment_id;
     const payment_status =
       requestData.payment_status || requestData.data?.status;
+
+    console.log({ payment_id, payment_status });
+
     if (!payment_id || !payment_status) {
       return sendAPIResponse(
         { error: "payment_id and payment_status are required." },
@@ -111,6 +127,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (existingPayment) {
+      console.log("This payment has already been processed.");
       return sendAPIResponse(
         { error: "This payment has already been processed." },
         errorStatusCode // Conflict
@@ -158,8 +175,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const CREDITS_TO_ADD = CREDIT_UPDATE_MAP[dodoValidationResult.planId];
+
+    console.log({ CREDITS_TO_ADD });
+
     const currentCredits = userCredits.amount;
     const newCredits = currentCredits + CREDITS_TO_ADD;
+
+    console.log({ currentCredits, newCredits });
 
     // Update user credits
     const { error: updateError } = await supabaseClient
