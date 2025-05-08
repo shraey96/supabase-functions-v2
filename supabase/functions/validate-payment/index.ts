@@ -129,8 +129,8 @@ Deno.serve(async (req: Request) => {
     if (existingPayment) {
       console.log("This payment has already been processed.");
       return sendAPIResponse(
-        { error: "This payment has already been processed." },
-        errorStatusCode // Conflict
+        { error: "This payment has already been processed.", success: true },
+        200 // Conflict
       );
     }
 

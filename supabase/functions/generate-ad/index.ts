@@ -163,7 +163,9 @@ Deno.serve(async (req: Request) => {
         .eq("id", adId);
 
       // Format the prompt using OpenAI
-      const formattedPrompt = await getImageGenPrompt(prompt!);
+      const formattedPrompt = await getImageGenPrompt(prompt!, adType!);
+
+      console.log({ formattedPrompt });
 
       // Call OpenAI API directly with the files
       const imageResults = await generateImages(

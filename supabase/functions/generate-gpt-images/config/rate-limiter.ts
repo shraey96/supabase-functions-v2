@@ -1,7 +1,7 @@
 import { isDev } from "../../shared/constants.ts";
 import { RateLimiterConfig } from "../../shared/utils/rate-limiter.ts";
 
-const MAX_REQUESTS_PER_DAY = isDev ? 10 : 2;
+const MAX_REQUESTS_PER_DAY = isDev ? 10 : 1;
 
 /**
  * Configuration for the generate-gpt-images function
