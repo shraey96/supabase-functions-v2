@@ -6,6 +6,12 @@ CREATE POLICY "Users can insert their own credits"
 ON public.credits FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
+-- Allow service_role to insert into credits table (e.g., for initial credit allocation by triggers)
+CREATE POLICY "Service role can insert credits"
+ON public.credits FOR INSERT
+TO service_role -- Or specify the role that owns the SECURITY DEFINER function
+WITH CHECK (true); -- service_role can insert any valid record
+
 -- Function to ensure user has credits
 CREATE OR REPLACE FUNCTION public.ensure_user_credits()
 RETURNS TRIGGER AS $$

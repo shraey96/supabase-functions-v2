@@ -10,4 +10,7 @@ export const CREDIT_UPDATE_MAP = {
   pdt_LAvfGR7qU7Xkf83fDmYxd: 60,
   pdt_2v8W0s7zDPsU3GkrhFMEI: 160,
   pdt_fPXoHnNr9AYemVwqOS8Tq: 320,
+
+  // mock production
+  pdt_njNQLgxzfhm5NR1xDQUPc: 10,
 };

@@ -75,10 +75,8 @@ Your task is to reformat and enhance the user's prompt by:
 - Making the structure clear, concise, and visually descriptive.
 - Rewording for clarity, but not adding or removing details unless clearly implied by the user.
 - Improving flow, style, and grammar without changing the original meaning.
-
-Preserve all user-specified elements (product details, styles, settings) unless clarification is needed.
-
-Output only the final, enhanced prompt. Do not include any commentary.`;
+- Include any information about the usage of reference images in the prompt if mentioned by the user.
+`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
