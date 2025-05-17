@@ -41,11 +41,7 @@ export async function generateImages(
   );
   console.log("Files converted to OpenAI compatible format");
 
-  let imageQuality = quality;
-
-  if (isDev || config.IS_FREE) {
-    imageQuality = "high";
-  }
+  let imageQuality = "auto";
 
   // Call OpenAI API with files directly
   console.log("Calling OpenAI API");
